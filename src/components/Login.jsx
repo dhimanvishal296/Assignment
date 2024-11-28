@@ -20,7 +20,7 @@ const Login = () => {
     try {
       // API call to validate the username
       const response = await fetch(
-        `http://hn.algolia.com/api/v1/users/${username}`,
+        `https://hn.algolia.com/api/v1/users/${username}`,
         {
           method: "GET",
           mode: "cors",
