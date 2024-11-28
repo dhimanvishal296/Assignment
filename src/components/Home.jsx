@@ -36,7 +36,7 @@ const Home = () => {
   const fetchSearchResults = async () => {
     try {
       const response = await fetch(
-        `http://hn.algolia.com/api/v1/search?query=${searchQuery}&tags=${filterTag}&page=${page}`
+        `https://hn.algolia.com/api/v1/search?query=${searchQuery}&tags=${filterTag}&page=${page}`
       );
       const data = await response.json();
       setSearchResults(data.hits || []);
