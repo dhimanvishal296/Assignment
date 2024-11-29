@@ -17,12 +17,17 @@ const Home = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [user, setUser] = useState(null);
+  const [searchQuery, setSearchQuery] = useState(
+    searchParams.get("query") || ""
+  );
   const [searchResults, setSearchResults] = useState([]);
   const [totalPages, setTotalPages] = useState(1);
 
-  const searchQuery = searchParams.get("query") || "";
   const filterTag = searchParams.get("tags") || "story";
   const page = Number(searchParams.get("page")) || 0;
+  const timeRange = searchParams.get("timeRange") || "all";
+  const sortBy = searchParams.get("sortBy") || "popularity";
+  const sortParameter = sortBy === "date" ? "search_by_date" : "search";
 
   useEffect(() => {
     const loggedInUser = JSON.parse(localStorage.getItem("user"));
@@ -35,24 +40,66 @@ const Home = () => {
 
   const fetchSearchResults = async () => {
     try {
+      let numericFilter = "";
+
+      // Time range logic
+      const now = Math.floor(Date.now() / 1000);
+      switch (timeRange) {
+        case "last24h":
+          numericFilter = `created_at_i>${now - 86400}`;
+          break;
+        case "pastWeek":
+          numericFilter = `created_at_i>${now - 7 * 86400}`;
+          break;
+        case "pastMonth":
+          numericFilter = `created_at_i>${now - 30 * 86400}`;
+          break;
+        case "pastYear":
+          numericFilter = `created_at_i>${now - 365 * 86400}`;
+          break;
+        default:
+          break;
+      }
+
       const response = await fetch(
-        `https://hn.algolia.com/api/v1/search?query=${searchQuery}&tags=${filterTag}&page=${page}`
+        `http://hn.algolia.com/api/v1/${sortParameter}?query=${searchQuery}&tags=${filterTag}&numericFilters=${numericFilter}&page=${page}`
       );
+
       const data = await response.json();
       setSearchResults(data.hits || []);
       setTotalPages(data.nbPages || 1);
-    } catch (error) {
-      console.error("Error fetching search results:", error);
+    } catch (err) {
+      console.error("Error fetching results:", err);
     }
   };
 
   const handleSearch = (e) => {
     e.preventDefault();
-    setSearchParams({ query: searchQuery, tags: filterTag, page: 0 });
+    setSearchParams({
+      query: searchQuery,
+      tags: filterTag,
+      page: 0,
+      timeRange,
+    });
   };
 
   const handlePagination = (event, value) => {
-    setSearchParams({ query: searchQuery, tags: filterTag, page: value - 1 });
+    setSearchParams({
+      query: searchQuery,
+      tags: filterTag,
+      page: value - 1,
+      timeRange,
+    });
+  };
+
+  const handleFilterChange = (key, value) => {
+    setSearchParams({
+      query: searchQuery,
+      tags: key === "tags" ? value : filterTag,
+      page: 0,
+      timeRange: key === "timeRange" ? value : timeRange,
+      sortBy: key === "sortBy" ? value : sortBy, // Add this
+    });
   };
 
   useEffect(() => {
@@ -61,6 +108,7 @@ const Home = () => {
 
   return (
     <Box sx={{ backgroundColor: "#f6f6ef" }}>
+      {/* Header */}
       <Box
         sx={{
           display: "flex",
@@ -83,23 +131,13 @@ const Home = () => {
             placeholder="Search stories by title, url or author"
             size="small"
             value={searchQuery}
-            onChange={(e) =>
-              setSearchParams({
-                query: e.target.value,
-                tags: filterTag,
-                page: 0,
-              })
-            }
+            onChange={(e) => setSearchQuery(e.target.value)}
             sx={{
               minWidth: "700px",
               backgroundColor: "white",
               "& .MuiOutlinedInput-root": {
-                "&:hover fieldset": {
-                  borderColor: "transparent", // Removes the hover effect border
-                },
-                "&.Mui-focused fieldset": {
-                  borderColor: "transparent", // Removes the focus outline border
-                },
+                "&:hover fieldset": { borderColor: "transparent" },
+                "&.Mui-focused fieldset": { borderColor: "transparent" },
               },
             }}
             InputProps={{
@@ -126,135 +164,106 @@ const Home = () => {
           <FiSettings fontSize={25} />
         </IconButton>
       </Box>
-      <Box sx={{display:"flex", alignItems:"center", gap:"0.4rem", padding:"0.5rem 1rem"}}>
+
+      {/* Filters */}
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          gap: "0.4rem",
+          padding: "0.5rem 1rem",
+        }}
+      >
         search
         <Select
           value={filterTag}
           size="small"
-          onChange={(e) =>
-            setSearchParams({
-              query: searchQuery,
-              tags: e.target.value,
-              page: 0,
-            })
-          }
+          onChange={(e) => handleFilterChange("tags", e.target.value)}
         >
           <MenuItem value="story">Story</MenuItem>
-          <MenuItem value="comment">Comment</MenuItem>
           <MenuItem value="poll">Poll</MenuItem>
+          <MenuItem value="comment">Comment</MenuItem>
         </Select>
         by
         <Select
-          value={filterTag}
           size="small"
-          onChange={(e) =>
-            setSearchParams({
-              query: searchQuery,
-              tags: e.target.value,
-              page: 0,
-            })
-          }
+          value={searchParams.get("sortBy") || "popularity"}
+          onChange={(e) => handleFilterChange("sortBy", e.target.value)}
         >
-          <MenuItem value="story">Story</MenuItem>
-          <MenuItem value="comment">Comment</MenuItem>
-          <MenuItem value="poll">Poll</MenuItem>
+          <MenuItem value="popularity">Popularity</MenuItem>
+          <MenuItem value="date">Date</MenuItem>
         </Select>
         for
         <Select
-          value={filterTag}
           size="small"
-          onChange={(e) =>
-            setSearchParams({
-              query: searchQuery,
-              tags: e.target.value,
-              page: 0,
-            })
-          }
+          value={timeRange}
+          onChange={(e) => handleFilterChange("timeRange", e.target.value)}
         >
-          <MenuItem value="story">Story</MenuItem>
-          <MenuItem value="comment">Comment</MenuItem>
-          <MenuItem value="poll">Poll</MenuItem>
+          <MenuItem value="all">All Time</MenuItem>
+          <MenuItem value="last24h">Last 24h</MenuItem>
+          <MenuItem value="pastWeek">Past Week</MenuItem>
+          <MenuItem value="pastMonth">Past Month</MenuItem>
+          <MenuItem value="pastYear">Past Year</MenuItem>
         </Select>
       </Box>
+
+      {/* Results */}
       <Box sx={{ padding: "1rem", backgroundColor: "#f6f6ef" }}>
-        {searchResults.map((result) => (
-          <Box key={result.objectID} sx={{ marginBottom: "1.5rem" }}>
-            <Box sx={{ display: "flex", gap: "0.5rem", alignItems: "center" }}>
-              <Typography variant="body1" sx={{ fontWeight: "bold" }}>
-                <a
-                  href={`https://news.ycombinator.com/item?id=${result.objectID}`}
-                  target="_blank"
-                  style={{ color: "inherit", textDecoration: "none" }}
-                >
-                  {result.title || "No Title Available"}
-                </a>
-              </Typography>
-              <Typography
-                variant="body2"
-                sx={{ fontWeight: "400" }}
-                color="textSecondary"
+        {searchResults.length > 0 ? (
+          searchResults.map((result) => (
+            <Box key={result.objectID} sx={{ marginBottom: "1.5rem" }}>
+              <Box
+                sx={{ display: "flex", gap: "0.5rem", alignItems: "center" }}
               >
-                <a
-                  href={result.url}
-                  target="_blank"
-                  style={{ color: "inherit", textDecoration: "none" }}
-                >
-                  {`(${result.url})`}
-                </a>
+                <Typography variant="body1" sx={{ fontWeight: "bold" }}>
+                  <a
+                    href={`https://news.ycombinator.com/item?id=${result.objectID}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: "inherit", textDecoration: "none" }}
+                  >
+                    {result.title || "No Title Available"}
+                  </a>
+                </Typography>
+                {result.url && (
+                  <Typography variant="body2" color="textSecondary">
+                    <a
+                      href={result.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: "inherit", textDecoration: "none" }}
+                    >
+                      {`(${result.url})`}
+                    </a>
+                  </Typography>
+                )}
+              </Box>
+              <Typography variant="body2" color="textSecondary">
+                {result.points || 0} points | {result.author || "Unknown"} |{" "}
+                {result.num_comments || 0} comments
               </Typography>
             </Box>
-            <Typography variant="body2" color="textSecondary">
-              <a
-                href={`https://news.ycombinator.com/item?id=${result.objectID}`}
-                style={{ color: "inherit", textDecoration: "none" }}
-              >
-                {result.points || 0} points
-              </a>{" "}
-              |{" "}
-              <a
-                href={`https://news.ycombinator.com/user?id=${result.author}`}
-                style={{ color: "inherit", textDecoration: "none" }}
-              >
-                {result.author || "Unknown"}
-              </a>{" "}
-              |{" "}
-              <a
-                href={`https://news.ycombinator.com/item?id=${result.objectID}`}
-                style={{ color: "inherit", textDecoration: "none" }}
-              >
-                {result.created_at || "Unknown time"}
-              </a>{" "}
-              |{" "}
-              <a
-                href={`https://news.ycombinator.com/item?id=${result.objectID}`}
-                style={{ color: "inherit", textDecoration: "none" }}
-              >
-                {result.num_comments || 0} comments
-              </a>
-            </Typography>
-          </Box>
-        ))}
+          ))
+        ) : (
+          <Typography>No results found</Typography>
+        )}
       </Box>
 
+      {/* Pagination */}
       <Pagination
         count={totalPages}
         page={page + 1}
         onChange={handlePagination}
-        onClick={window.scroll(0, 0)}
         color="standard"
         sx={{
           justifyContent: "center",
           display: "flex",
           "& .MuiPaginationItem-root": {
-            color: "#ff742b", // Orange color for the default state
+            color: "#ff742b",
           },
           "& .MuiPaginationItem-root.Mui-selected": {
-            backgroundColor: "#ff742b", // Orange background when selected
-            color: "white", // White text when selected
-          },
-          "& .MuiPaginationItem-root:hover": {
-            backgroundColor: "#ff742b", // Orange background on hover
-            color: "white", // White text on hover
+            backgroundColor: "#ff742b",
+            color: "white",
           },
         }}
       />
