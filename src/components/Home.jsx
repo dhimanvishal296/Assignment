@@ -62,7 +62,7 @@ const Home = () => {
       }
 
       const response = await fetch(
-        `http://hn.algolia.com/api/v1/${sortParameter}?query=${searchQuery}&tags=${filterTag}&numericFilters=${numericFilter}&page=${page}`
+        `https://hn.algolia.com/api/v1/${sortParameter}?query=${searchQuery}&tags=${filterTag}&numericFilters=${numericFilter}&page=${page}`
       );
 
       const data = await response.json();

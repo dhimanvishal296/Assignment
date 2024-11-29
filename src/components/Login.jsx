@@ -77,7 +77,7 @@ const Login = () => {
         />
         <TextField
           label="Password"
-          type="text"
+          type="password"
           placeholder="enter 12345"
           variant="outlined"
           fullWidth
